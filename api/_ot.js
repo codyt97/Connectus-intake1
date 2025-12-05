@@ -266,11 +266,13 @@ return {
     ].filter(Boolean).join(' ').trim(),
     phone:   x.PrimaryContact?.Phone || '',       // if your tenant exposes it
     email:   x.BillAddress?.Email || '',          // OT puts email on the address block
-    street:  x.BillAddress?.Addr1 || '',
-    suite:   x.BillAddress?.Addr2 || x.BillAddress?.Addr3 || '',
-    city:    x.BillAddress?.City || '',
-    state:   x.BillAddress?.State || '',
-    zip:     x.BillAddress?.Zip || ''
+// Many tenants store the company/care-of in Addr1 and the actual street in Addr2
+street:  x.BillAddress?.Addr2 || x.BillAddress?.Addr1 || '',
+suite:   x.BillAddress?.Addr3 || '',
+city:    x.BillAddress?.City || '',
+state:   x.BillAddress?.State || '',
+zip:     x.BillAddress?.Zip || ''
+
   },
 
   shipping: {
@@ -278,11 +280,13 @@ return {
     contact: '',                                   // fill if your tenant has ship-to contact fields
     phone:   '',                                   // fill if present
     email:   x.PrimaryShipAddress?.Email || '',
-    street:  x.PrimaryShipAddress?.Addr1 || '',
-    suite:   x.PrimaryShipAddress?.Addr2 || x.PrimaryShipAddress?.Addr3 || '',
-    city:    x.PrimaryShipAddress?.City || '',
-    state:   x.PrimaryShipAddress?.State || '',
-    zip:     x.PrimaryShipAddress?.Zip || '',
+// Same pattern: street is usually in Addr2, company/care-of in Addr1
+street:  x.PrimaryShipAddress?.Addr2 || x.PrimaryShipAddress?.Addr1 || '',
+suite:   x.PrimaryShipAddress?.Addr3 || '',
+city:    x.PrimaryShipAddress?.City || '',
+state:   x.PrimaryShipAddress?.State || '',
+zip:     x.PrimaryShipAddress?.Zip || '',
+
     residence: false                               // set if your tenant flags residential on ship-to
   },
 
@@ -293,11 +297,28 @@ return {
     agreement: false
   },
 
+    // Shipping tab defaults from the OT Customer record
   shippingOptions: {
-    pay:   x.ShipMethodRef?.Name || '',
-    speed: '',
-    shortShip: ''
+    // Carrier method, e.g. "FedEx Ground Home Delivery - RPHD"
+    shipMethod:  x.ShipMethodRef?.Name || '',
+
+    // How freight is paid, e.g. "Customer FedEx Account"
+    payMethod:   x.ShipPayMethod || '',
+
+    // Freight type, e.g. "[TPB] Third Party Billing, to the account number supplied below"
+    freightType: x.FreightTypeRef?.Name || x.FreightType || '',
+
+    // OT "ShortShip" usually holds "MustShipComplete"/"MayShipPartial"
+    shortShip:   x.ShortShip || '',
+
+    // Blind Ship flag if your tenant exposes it
+    blindShip:   !!x.BlindShip,
+
+    // Legacy fields kept so older JSON doesn’t explode
+    pay:   x.ShipPayMethod || '',
+    speed: ''
   },
+
 
   rep: {
     primary:   x.SalesRepRef?.Name || '',
