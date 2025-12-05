@@ -340,8 +340,14 @@
 <div class="actions">
   <button class="ghost" id="btnOpenEmail" data-open-email onclick="openEmailDrawerGuarded()">Email Order Management</button>
   <!-- <button class="ok" id="btnSubmitIntake">Submit Intake</button> -->
+
+  <!-- NEW: Save / Clear draft buttons -->
+  <button class="ghost" id="btnSaveDraft" type="button">Save Draft</button>
+  <button class="ghost" id="btnClearDraft" type="button">Clear Saved Draft</button>
+
   <span id="submitStatus" class="tiny" style="margin-left:10px"></span>
 </div>
+
 <script>
   function openEmailDrawerGuarded(){
   const { ok, missing } = validateRequiredForEmail();
@@ -4647,6 +4653,268 @@ function setCellInput(td, val) {
   const el = td.querySelector('input,textarea,select');
   if (el) el.value = (val ?? '').toString();
 }
+</script>
+
+<!-- ===== Multi-Draft Save/Resume (Per Sales Rep) ===== -->
+<script>
+  const INTAKE_DRAFT_PREFIX = 'connectus_intake_draft_v2::';
+  const INTAKE_MAX_DRAFTS_PER_REP = 5;
+
+  function getCurrentRepContext() {
+    const sel = document.getElementById('wizRepPick');
+    if (!sel) return null;
+    const name = sel.value || '';
+    if (!name || name === 'Other') return null;
+
+    let slug = name;
+    try {
+      if (typeof getRepByName === 'function') {
+        const rep = getRepByName(name);
+        if (rep && rep.slug) slug = rep.slug;
+      }
+    } catch (err) {
+      console.warn('getRepByName failed', err);
+    }
+
+    return { name, slug };
+  }
+
+  function getRepDraftKey(ctx) {
+    if (!ctx || !ctx.slug) return null;
+    return INTAKE_DRAFT_PREFIX + ctx.slug;
+  }
+
+  function loadRepDrafts(ctx) {
+    const key = getRepDraftKey(ctx);
+    if (!key) return [];
+    const raw = localStorage.getItem(key);
+    if (!raw) return [];
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed.drafts)) return parsed.drafts;
+      // Backwards compat: if we ever stored a single draft
+      if (parsed && parsed.fields) return [parsed];
+      return [];
+    } catch (err) {
+      console.error('Failed to parse drafts JSON', err);
+      return [];
+    }
+  }
+
+  function saveRepDrafts(ctx, drafts) {
+    const key = getRepDraftKey(ctx);
+    if (!key) return;
+    const payload = { drafts: drafts || [] };
+    localStorage.setItem(key, JSON.stringify(payload));
+  }
+
+  function collectIntakeDraftState() {
+    const panel = document.querySelector('[data-mainpanel="intake"]');
+    if (!panel) return null;
+
+    const now = Date.now();
+    const data = {
+      ts: now,
+      fields: {},
+      itemsHTML: null
+    };
+
+    // Capture all inputs/selects/textareas with an ID inside Intake panel
+    panel.querySelectorAll('input[id], select[id], textarea[id]').forEach(el => {
+      const id = el.id;
+      if (!id) return;
+
+      if (el.type === 'checkbox' || el.type === 'radio') {
+        data.fields[id] = { type: el.type, checked: el.checked };
+      } else {
+        data.fields[id] = { type: 'value', value: el.value };
+      }
+    });
+
+    // 🔐 Capture Items table body HTML (all lines, QR IDs, SKUs, Qty, etc.)
+    const itemsBody = document.getElementById('itemsBody');
+    if (itemsBody) {
+      data.itemsHTML = itemsBody.innerHTML;
+    }
+
+    return data;
+  }
+
+  function buildDraftLabel() {
+    const billCompany = document.getElementById('billCompany')?.value?.trim();
+    const shipCompany = document.getElementById('shipCompany')?.value?.trim();
+    const custLabel = billCompany || shipCompany || 'Untitled';
+
+    let docType = 'Unknown';
+    try {
+      const checked = document.querySelector('input[name="doctype"]:checked');
+      if (checked && checked.value) docType = checked.value;
+    } catch (_) {}
+
+    return `${custLabel} — ${docType}`;
+  }
+
+  function saveIntakeDraft() {
+    const ctx = getCurrentRepContext();
+    if (!ctx) {
+      alert('Select a Sales Rep in Step 1 before saving a draft.');
+      return;
+    }
+
+    const state = collectIntakeDraftState();
+    if (!state) {
+      alert('Nothing to save right now.');
+      return;
+    }
+
+    const label = buildDraftLabel();
+    const draft = {
+      id: state.ts,  // simple unique id
+      ts: state.ts,
+      label,
+      fields: state.fields,
+      itemsHTML: state.itemsHTML
+    };
+
+    let drafts = loadRepDrafts(ctx);
+    drafts.push(draft);
+
+    // Keep newest first, limit count
+    drafts.sort((a, b) => b.ts - a.ts);
+    if (drafts.length > INTAKE_MAX_DRAFTS_PER_REP) {
+      drafts = drafts.slice(0, INTAKE_MAX_DRAFTS_PER_REP);
+    }
+
+    saveRepDrafts(ctx, drafts);
+
+    const status = document.getElementById('submitStatus');
+    if (status) {
+      const dt = new Date(draft.ts);
+      status.textContent = `Draft saved (${ctx.name} · ${label}) at ` + dt.toLocaleString();
+    }
+
+    alert(`Draft saved for ${ctx.name}:\n${label}`);
+  }
+
+  function applyIntakeDraft(draft) {
+    if (!draft || !draft.fields) return false;
+
+    // Restore fields
+    for (const [id, meta] of Object.entries(draft.fields)) {
+      const el = document.getElementById(id);
+      if (!el) continue;
+
+      if (meta.type === 'checkbox' || meta.type === 'radio') {
+        el.checked = !!meta.checked;
+      } else {
+        el.value = meta.value ?? '';
+      }
+    }
+
+    // Restore Items table HTML
+    const itemsBody = document.getElementById('itemsBody');
+    if (itemsBody && typeof draft.itemsHTML === 'string') {
+      itemsBody.innerHTML = draft.itemsHTML;
+    }
+
+    // Ensure intake UI is visible
+    if (typeof openIntakeTabs === 'function') {
+      openIntakeTabs();
+    }
+
+    const status = document.getElementById('submitStatus');
+    if (status) {
+      const dt = draft.ts ? new Date(draft.ts) : null;
+      const when = dt ? dt.toLocaleString() : '';
+      status.textContent = when
+        ? `Resumed draft: ${draft.label} (${when})`
+        : `Resumed draft: ${draft.label}`;
+    }
+
+    return true;
+  }
+
+  function promptAndLoadDraftForCurrentRep() {
+    const ctx = getCurrentRepContext();
+    if (!ctx) return;
+
+    const drafts = loadRepDrafts(ctx);
+    if (!drafts.length) return;
+
+    if (drafts.length === 1) {
+      const d = drafts[0];
+      const dt = d.ts ? new Date(d.ts).toLocaleString() : '';
+      const msg = dt
+        ? `A saved draft for ${ctx.name} from ${dt} was found:\n${d.label}\n\nDo you want to load it?`
+        : `A saved draft for ${ctx.name} was found:\n${d.label}\n\nDo you want to load it?`;
+      if (confirm(msg)) {
+        const ok = applyIntakeDraft(d);
+        if (!ok) alert('Saved draft could not be loaded (it may be corrupted).');
+      }
+      return;
+    }
+
+    // Multiple drafts: let the rep pick one via prompt
+    let list = `Saved drafts for ${ctx.name}:\n\n`;
+    drafts.forEach((d, idx) => {
+      const dt = d.ts ? new Date(d.ts).toLocaleString() : '';
+      list += `${idx + 1}) ${d.label}${dt ? ' — ' + dt : ''}\n`;
+    });
+    list += `\nEnter the number of the draft to load, or Cancel to skip.`;
+
+    const choice = prompt(list);
+    if (!choice) return;
+    const idx = parseInt(choice, 10);
+    if (isNaN(idx) || idx < 1 || idx > drafts.length) {
+      alert('Invalid choice; no draft loaded.');
+      return;
+    }
+
+    const selected = drafts[idx - 1];
+    const ok = applyIntakeDraft(selected);
+    if (!ok) {
+      alert('Saved draft could not be loaded (it may be corrupted).');
+    }
+  }
+
+  function clearIntakeDraft() {
+    const ctx = getCurrentRepContext();
+    if (!ctx) {
+      alert('Select a Sales Rep in Step 1 to clear drafts.');
+      return;
+    }
+
+    const drafts = loadRepDrafts(ctx);
+    if (!drafts.length) {
+      alert(`No drafts found for ${ctx.name} on this browser.`);
+      return;
+    }
+
+    if (!confirm(`This will delete ALL saved drafts for ${ctx.name} on this browser. Continue?`)) {
+      return;
+    }
+
+    saveRepDrafts(ctx, []); // wipe
+    const status = document.getElementById('submitStatus');
+    if (status) status.textContent = `All drafts cleared for ${ctx.name}.`;
+    alert(`All drafts cleared for ${ctx.name} on this browser.`);
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const saveBtn  = document.getElementById('btnSaveDraft');
+    const clearBtn = document.getElementById('btnClearDraft');
+    const repSel   = document.getElementById('wizRepPick');
+
+    if (saveBtn)  saveBtn.addEventListener('click', saveIntakeDraft);
+    if (clearBtn) clearBtn.addEventListener('click', clearIntakeDraft);
+
+    if (repSel) {
+      repSel.addEventListener('change', () => {
+        // When rep changes, offer to load one of their drafts (if any)
+        promptAndLoadDraftForCurrentRep();
+      });
+    }
+  });
 </script>
 
 </body>
