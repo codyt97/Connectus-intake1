@@ -4713,31 +4713,50 @@ function setCellInput(td, val) {
     if (!panel) return null;
 
     const now = Date.now();
-    const data = {
-      ts: now,
-      fields: {},
-      itemsHTML: null
-    };
+const data = {
+  ts: now,
+  fields: {},
+  itemsHTML: null,
+  itemsData: []          // 🔹 NEW: store values per cell
+};
 
-    // Capture all inputs/selects/textareas with an ID inside Intake panel
-    panel.querySelectorAll('input[id], select[id], textarea[id]').forEach(el => {
-      const id = el.id;
-      if (!id) return;
+// Capture all inputs/selects/textareas with an ID inside Intake panel
+panel.querySelectorAll('input[id], select[id], textarea[id]').forEach(el => {
+  const id = el.id;
+  if (!id) return;
+
+  if (el.type === 'checkbox' || el.type === 'radio') {
+    data.fields[id] = { type: el.type, checked: el.checked };
+  } else {
+    data.fields[id] = { type: 'value', value: el.value };
+  }
+});
+
+// 🔐 Capture Items table body HTML (all lines, QR IDs, SKUs, Qty, etc.)
+const itemsBody = document.getElementById('itemsBody');
+if (itemsBody) {
+  // Keep the structure (rows, columns, buttons, etc.)
+  data.itemsHTML = itemsBody.innerHTML;
+
+  // Also capture the values in each cell so we can restore them later
+  const rows = Array.from(itemsBody.querySelectorAll('tr'));
+  data.itemsData = rows.map(tr => {
+    const cells = Array.from(tr.querySelectorAll('td'));
+    return cells.map(td => {
+      const el = td.querySelector('input,select,textarea');
+      if (!el) return null;
 
       if (el.type === 'checkbox' || el.type === 'radio') {
-        data.fields[id] = { type: el.type, checked: el.checked };
-      } else {
-        data.fields[id] = { type: 'value', value: el.value };
+        return { type: el.type, checked: el.checked };
       }
+
+      return { type: 'value', value: el.value };
     });
+  });
+}
 
-    // 🔐 Capture Items table body HTML (all lines, QR IDs, SKUs, Qty, etc.)
-    const itemsBody = document.getElementById('itemsBody');
-    if (itemsBody) {
-      data.itemsHTML = itemsBody.innerHTML;
-    }
+return data;
 
-    return data;
   }
 
   function buildDraftLabel() {
@@ -4769,12 +4788,14 @@ function setCellInput(td, val) {
 
     const label = buildDraftLabel();
     const draft = {
-      id: state.ts,  // simple unique id
-      ts: state.ts,
-      label,
-      fields: state.fields,
-      itemsHTML: state.itemsHTML
-    };
+  id: state.ts,  // simple unique id
+  ts: state.ts,
+  label,
+  fields: state.fields,
+  itemsHTML: state.itemsHTML,
+  itemsData: state.itemsData || []   // 🔹 NEW
+};
+
 
     let drafts = loadRepDrafts(ctx);
     drafts.push(draft);
@@ -4811,16 +4832,45 @@ function setCellInput(td, val) {
       }
     }
 
-    // Restore Items table HTML
-    const itemsBody = document.getElementById('itemsBody');
-    if (itemsBody && typeof draft.itemsHTML === 'string') {
-      itemsBody.innerHTML = draft.itemsHTML;
-    }
+    // Restore Items table HTML + values
+const itemsBody = document.getElementById('itemsBody');
+if (itemsBody && typeof draft.itemsHTML === 'string') {
+  // First restore the structure
+  itemsBody.innerHTML = draft.itemsHTML;
 
-    // Ensure intake UI is visible
-    if (typeof openIntakeTabs === 'function') {
-      openIntakeTabs();
-    }
+  // Then restore the cell values if we have them
+  if (Array.isArray(draft.itemsData)) {
+    const rows = Array.from(itemsBody.querySelectorAll('tr'));
+
+    draft.itemsData.forEach((rowData, rIndex) => {
+      if (!Array.isArray(rowData)) return;
+      const tr = rows[rIndex];
+      if (!tr) return;
+
+      const cells = Array.from(tr.querySelectorAll('td'));
+      rowData.forEach((cellData, cIndex) => {
+        if (!cellData) return;
+        const td = cells[cIndex];
+        if (!td) return;
+
+        const el = td.querySelector('input,select,textarea');
+        if (!el) return;
+
+        if (cellData.type === 'checkbox' || cellData.type === 'radio') {
+          el.checked = !!cellData.checked;
+        } else {
+          el.value = cellData.value ?? '';
+        }
+      });
+    });
+  }
+}
+
+// Ensure intake UI is visible
+if (typeof openIntakeTabs === 'function') {
+  openIntakeTabs();
+}
+
 
     const status = document.getElementById('submitStatus');
     if (status) {
