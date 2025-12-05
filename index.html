@@ -546,26 +546,27 @@ window.addEventListener('DOMContentLoaded', function initEmailDrawerAutoClose(){
           <div class="table-wrap" style="overflow:auto;margin-top:8px">
             <table class="table" id="itemsTbl"><thead><tr>
               <th>Description (Mfg / Model / Size / Color)</th>
-              <th>Model / Part #</th>
-              <th>Color</th>
-              <th>OrderTime SKU</th>
-              <th>Qty</th>
-              <th>Line Instruction</th>
-              <th>LTE / Wi-Fi / Both</th>
-              <th>Carrier</th>
-              <th>Act Payout $</th>
-              <th>MSRP</th>
-              <th>Disc %</th>
-              <th>Sell Price</th>
-              <th>New / CPO</th>
-              <th>In Stock?</th>
-              <th>Vendor</th>
-              <th>Quoted Cost</th>
-              <th>DLL / SPA Price / Deal Reg #</th>
-              <th>Hold/Reservation #</th>
-              <th>Delivery Lead Time</th>
-              <th>EOL Confirm</th>
-              <th>Remove</th>
+<th>OrderTime SKU</th>
+<th>Qty</th>
+<th>Sell Price</th>
+<th>Line Instruction</th>
+<th>Model / Part #</th>
+<th>Color</th>
+<th>LTE / Wi-Fi / Both</th>
+<th>Carrier</th>
+<th>Act Payout $</th>
+<th>MSRP</th>
+<th>Disc %</th>
+<th>New / CPO</th>
+<th>In Stock?</th>
+<th>Vendor</th>
+<th>Quoted Cost</th>
+<th>DLL / SPA Price / Deal Reg #</th>
+<th>Hold/Reservation #</th>
+<th>Delivery Lead Time</th>
+<th>EOL Confirm</th>
+<th>Remove</th>
+
             </tr></thead><tbody id="itemsBody"></tbody></table>
           </div>
 
@@ -1269,8 +1270,8 @@ function upsertDeclineInsuranceLine(){
     if (!tr) return;
   }
   const descEl  = _getCellInput(tr, 'desc', 0);
-  const skuEl   = _getCellInput(tr, 'sku', 3);
-  const priceEl = _getCellInput(tr, 'price', 11) || _getCellInput(tr, 'sell', 11);
+  const skuEl   = _getCellInput(tr, 'sku', 1);
+  const priceEl = _getCellInput(tr, 'price', 3) || _getCellInput(tr, 'sell', 11);
 
   if (descEl)  descEl.value  = DECLINE_DESC;
   if (skuEl)   skuEl.value   = DECLINE_SKU;
@@ -1479,9 +1480,10 @@ function buildLineCSV() {
 
   // Column indexes (from the table header)
   if (typeof window.COL_DESC === 'undefined') window.COL_DESC = 0;
-  if (typeof window.COL_SKU  === 'undefined') window.COL_SKU  = 3;
-  const COL_PAYOUT = (typeof window.COL_PAYOUT !== 'undefined') ? window.COL_PAYOUT : 8;  // "Act Payout $" (9th col)
-  const COL_SELL   = (typeof window.COL_SELL   !== 'undefined') ? window.COL_SELL   : 11; // "Sell Price" (12th col)
+if (typeof window.COL_SKU  === 'undefined') window.COL_SKU  = 1;
+const COL_PAYOUT = (typeof window.COL_PAYOUT !== 'undefined') ? window.COL_PAYOUT : 9;  // "Act Payout $" col
+const COL_SELL   = (typeof window.COL_SELL   !== 'undefined') ? window.COL_SELL   : 3;  // "Sell Price" col
+
 
   // Robust getters for payout & price
   function getPayout(tr) {
@@ -3608,28 +3610,29 @@ const QUOTE_REQUEST_MAP={
 function el(tag,attrs={},children=[]){const e=document.createElement(tag);Object.entries(attrs).forEach(([k,v])=>{if(k==='class')e.className=v;else if(k==='html')e.innerHTML=v;else if(k==='onclick')e.onclick=v;else e.setAttribute(k,v)});children.forEach(c=>e.appendChild(c));return e;}
 function addRow(prefill){
   const tr=el('tr');
-  const cols=[
-    {key:'desc', ph:'e.g., Apple iPad 256GB Space Gray'},
-    {key:'model', ph:'Model / Part #'},
-    {key:'color', ph:'Color'},
-    {key:'sku', ph:'ORDERTIME-SKU'},
-    {key:'qty', ph:'Qty', type:'number', min:1, val:1},
-    {key:'lineInstr', ph:'Line Instruction'},
-    {key:'net', ph:'LTE / Wi-Fi / Both'},
-    {key:'carrier', ph:'Carrier'},
-    {key:'payout', ph:'$', type:'number', step:'0.01'},
-    {key:'msrp', ph:'$', type:'number', step:'0.01'},
-    {key:'disc', ph:'%', type:'number', step:'0.01'},
-    {key:'sell', ph:'$', type:'number', step:'0.01'},
-    {key:'cond', ph:'New / CPO'},
-    {key:'stock', ph:'Yes/No'},
-    {key:'vendor', ph:'Vendor'},
-    {key:'cost', ph:'$', type:'number', step:'0.01'},
-    {key:'deal', ph:'DLL/SPA Price / Deal Reg #'},
-    {key:'hold', ph:'Hold/Reservation #'},
-    {key:'leadtime', ph:'Delivery Lead Time'},
-    {key:'eol', ph:'EOL Confirm (Yes/No)'}
-  ];
+  const cols = [
+  {key:'desc',     ph:'e.g., Apple iPad 256GB Space Gray'},
+  {key:'sku',      ph:'ORDERTIME-SKU'},
+  {key:'qty',      ph:'Qty', type:'number', min:1, val:1},
+  {key:'sell',     ph:'$', type:'number', step:'0.01'},           // Sell Price
+  {key:'lineInstr',ph:'Line Instruction'},
+  {key:'model',    ph:'Model / Part #'},
+  {key:'color',    ph:'Color'},
+  {key:'net',      ph:'LTE / Wi-Fi / Both'},
+  {key:'carrier',  ph:'Carrier'},
+  {key:'payout',   ph:'$', type:'number', step:'0.01'},
+  {key:'msrp',     ph:'$', type:'number', step:'0.01'},
+  {key:'disc',     ph:'%', type:'number', step:'0.01'},
+  {key:'cond',     ph:'New / CPO'},
+  {key:'stock',    ph:'Yes/No'},
+  {key:'vendor',   ph:'Vendor'},
+  {key:'cost',     ph:'$', type:'number', step:'0.01'},
+  {key:'deal',     ph:'DLL/SPA Price / Deal Reg #'},
+  {key:'hold',     ph:'Hold/Reservation #'},
+  {key:'leadtime', ph:'Delivery Lead Time'},
+  {key:'eol',      ph:'EOL Confirm (Yes/No)'}
+];
+
   cols.forEach(c=>{
   const td = el('td');
   const inp = el('input',{placeholder:c.ph});
@@ -3962,11 +3965,53 @@ function buildCSV(){
   ];
 
   const itemsHeader = [
-    'Line','Description','Model / Part #','Color','SKU','Qty','Network','Carrier','Act Payout $','MSRP','Disc %','Sell Price','Condition','In Stock','Vendor','Quoted Cost','DLL/SPA / Deal Reg #','Hold/Reservation #','Delivery Lead Time','EOL Confirm'
-  ];
+  'Line',
+  'Description',
+  'SKU',
+  'Qty',
+  'Sell Price',
+  'Line Instruction',
+  'Model / Part #',
+  'Color',
+  'Net Type',
+  'Carrier',
+  'Act Payout $',
+  'MSRP',
+  'Disc %',
+  'New / CPO',
+  'In Stock?',
+  'Vendor',
+  'Quoted Cost',
+  'DLL / SPA Price / Deal Reg #',
+  'Hold/Reservation #',
+  'Delivery Lead Time',
+  'EOL Confirm'
+];
+
   const itemsRows = lines.length ? lines.map((l,i)=>[
-    i+1, l.desc, l.model, l.color, l.sku, l.qty, l.net, l.carrier, l.payout, l.msrp, l.disc, l.sell, l.cond, l.stock, l.vendor, l.cost, l.deal, l.hold, l.leadtime, l.eol
-  ]) : [['(no items)']];
+  i+1,
+  l.desc,
+  l.sku,
+  l.qty,
+  l.sell,
+  l.lineInstr,
+  l.model,
+  l.color,
+  l.net,
+  l.carrier,
+  l.payout,
+  l.msrp,
+  l.disc,
+  l.cond,
+  l.stock,
+  l.vendor,
+  l.cost,
+  l.deal,
+  l.hold,
+  l.leadtime,
+  l.eol
+]) : [['(no items)']];
+
 
   const accessory = [
     ['Accessory SKU', val('accSku')], ['Accessory Description', val('accDesc')],
