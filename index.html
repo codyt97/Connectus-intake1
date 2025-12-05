@@ -218,9 +218,7 @@
             <option>Lucas Currin</option>
             <option>Max Mann</option>
             <option>John Tropeano</option>
-            <option>Greg Flannigan</option>
-            <option>Suliman Mohmand</option>
-            <option>Orlando</option>
+            <option>Chris Samaras</option>
           </select>
           <label style="margin-top:10px">Template Editor</label>
           <textarea id="repTemplateText" rows="12" placeholder="Template text with {{ Customer First Name }} and {{Current Email}} placeholders"></textarea>
@@ -2564,7 +2562,7 @@ We are excited to share that we have created a self service customer portal to m
 From this portal you will be able to: 
 View Order Statuses See order historyView Tracking InformationRetrieve IMEI & Sim Information (When applicable)Manage Billing & Shipping AddressesView & download invoicesAnd More! 
 
-Click here to create your user name and password:  https://connectuscorp.com/my-account/?salep-rep=anthony.liace 
+Click here to create your user name and password:  https://connectuscorp.com/my-account/?salep-rep=max-mann 
 
 Your email will serve as the admin for this account. You can add additional users once you register. If you would like to change the admin email, please email me. 
 
@@ -2609,87 +2607,6 @@ Your business is greatly appreciated!
 
 With Warmest Regards,
 John Tropeano
-
- `,
-  "Greg Flannigan": ` Hello {{ Customer First Name}}, 
-
-We are excited to share that we have created a self service customer portal to make engaging with ConnectUs an easier and more seamless experience. 
-
-From this portal you will be able to: 
-View Order Statuses See order historyView Tracking InformationRetrieve IMEI & Sim Information (When applicable)Manage Billing & Shipping AddressesView & download invoicesAnd More! 
-
-Click here to create your user name and password:  https://connectuscorp.com/my-account/?salep-rep=greg-flannigan 
-
-Your email will serve as the admin for this account. You can add additional users once you register. If you would like to change the admin email, please email me. 
-
-This is only the beginning! In the not so distant future, you will be able to place orders directly  from the portal which will save you time and provide you information you need in real time. 
-
-Our goal is to save you time and provide you the information you need on-demand. 
-
-We welcome you to provide any feedback you would like to see for future improvements or features. We will continually strive to improve your interactions with ConnectUs to make doing business with us an enjoyable experience. 
-
-Further instructions to follow once your account is created. 
-
-If we can help in any way, please do not hesitate to reach out. 
-
-Your business is greatly appreciated!
-
-With Warmest Regards,
-Greg Flannigan
-
- `,
-  "Suliman Mohmand": ` Hello {{ Customer First Name}}, 
-
-We are excited to share that we have created a self service customer portal to make engaging with ConnectUs an easier and more seamless experience. 
-
-From this portal you will be able to: 
-View Order Statuses See order historyView Tracking InformationRetrieve IMEI & Sim Information (When applicable)Manage Billing & Shipping AddressesView & download invoicesAnd More! 
-
-Click here to create your user name and password:  https://connectuscorp.com/my-account/?salep-rep=suliman-mohmand 
-
-Your email will serve as the admin for this account. You can add additional users once you register. If you would like to change the admin email, please email me. 
-
-This is only the beginning! In the not so distant future, you will be able to place orders directly  from the portal which will save you time and provide you information you need in real time. 
-
-Our goal is to save you time and provide you the information you need on-demand. 
-
-We welcome you to provide any feedback you would like to see for future improvements or features. We will continually strive to improve your interactions with ConnectUs to make doing business with us an enjoyable experience. 
-
-Further instructions to follow once your account is created. 
-
-If we can help in any way, please do not hesitate to reach out. 
-
-Your business is greatly appreciated!
-
-With Warmest Regards,
-Suliman Mohmand
-
- `,
-  "Orlando": ` Hello {{ Customer First Name}}, 
-
-We are excited to share that we have created a self service customer portal to make engaging with ConnectUs an easier and more seamless experience. 
-
-From this portal you will be able to: 
-View Order Statuses See order historyView Tracking InformationRetrieve IMEI & Sim Information (When applicable)Manage Billing & Shipping AddressesView & download invoicesAnd More! 
-
-Click here to create your user name and password:  https://connectuscorp.com/my-account/?salep-rep=orlando-calderon 
-
-Your email will serve as the admin for this account. You can add additional users once you register. If you would like to change the admin email, please email me. 
-
-This is only the beginning! In the not so distant future, you will be able to place orders directly  from the portal which will save you time and provide you information you need in real time. 
-
-Our goal is to save you time and provide you the information you need on-demand. 
-
-We welcome you to provide any feedback you would like to see for future improvements or features. We will continually strive to improve your interactions with ConnectUs to make doing business with us an enjoyable experience. 
-
-Further instructions to follow once your account is created. 
-
-If we can help in any way, please do not hesitate to reach out. 
-
-Your business is greatly appreciated!
-
-With Warmest Regards,
-Orlando
 
  `
 };
@@ -2825,11 +2742,8 @@ function loadReps(){
     // Seed with reps
     reps = [
       {name:"Lucas Currin", email:"lucas.currin@connectuscorp.com", slug:"lucas-currin", template:BASE_TEMPLATES["Lucas Currin"]},
-      {name:"Max Mann", email:"max.mann@connectuscorp.com", slug:"max.mann", template:BASE_TEMPLATES["Max Mann"]},
+      {name:"Max Mann", email:"max.mann@connectuscorp.com", slug:"max-mann", template:BASE_TEMPLATES["Max Mann"]},
       {name:"John Tropeano", email:"john.tropeano@connectuscorp.com", slug:"john-tropeano", template:BASE_TEMPLATES["John Tropeano"]},
-      {name:"Greg Flannigan", email:"greg.flannigan@connectuscorp.com", slug:"greg-flannigan", template:BASE_TEMPLATES["Greg Flannigan"]},
-      {name:"Suliman Mohmand", email:"suliman.mohmand@connectuscorp.com", slug:"suliman-mohmand", template:BASE_TEMPLATES["Suliman Mohmand"]},
-      {name:"Orlando Calderon", email:"orlando.calderon@connectuscorp.com", slug:"orlando-calderon", template:BASE_TEMPLATES["Orlando Calderon"]},
       {name:"Greg Weichert", email:"greg.weichert@connectuscorp.com", slug:"Greg Weichert", template:BASE_TEMPLATES["Greg Weichert"]}
     ];
     localStorage.setItem(LS_REPS_KEY, JSON.stringify(reps));
