@@ -966,7 +966,13 @@ function statusBox(){ const b = document.getElementById('submitStatus'); if (b) 
 
 function validateRequiredForEmail(){
   const miss = [];
-  ['shipPayMethod','shipMethod','freightType','reqShipDate','simCard','pairingOption','simHandling','insPlan'].forEach(clearErr);
+
+  // Clear previous error highlights
+  [
+    'shipPayMethod','shipMethod','freightType','reqShipDate',
+    'simCard','pairingOption','simHandling','insPlan',
+    'payMethod','billCompany','shipCompany'
+  ].forEach(clearErr);
   clearErr('itemsCard');
 
   const checkSel = (id, label)=>{
@@ -974,18 +980,36 @@ function validateRequiredForEmail(){
     if (isMissingSelectOrEmpty(el)){ miss.push(label); markErr(id); }
   };
 
+  const checkText = (id, label)=>{
+    const el = document.getElementById(id);
+    const val = (el?.value || '').trim();
+    if (!val){ miss.push(label); markErr(id); }
+  };
+
+  // Shipping-related required selects
   checkSel('shipPayMethod','Shipping Payment Method');
   checkSel('shipMethod','Ship Method');
   checkSel('freightType','Freight Type');
 
+  // Dates
   const rqd = document.getElementById('reqShipDate');
-  if (!rqd || !(rqd.value||'').trim()){ miss.push('Customer Requested Ship Date'); markErr('reqShipDate'); }
+  if (!rqd || !(rqd.value||'').trim()){
+    miss.push('Customer Requested Ship Date');
+    markErr('reqShipDate');
+  }
 
+  // SIM / Insurance
   checkSel('simCard','SIM Card');
   checkSel('pairingOption','Pairing Option');
   checkSel('simHandling','SIM Handling');
   checkSel('insPlan','Insurance Plan');
 
+  // NEW: core billing & payment fields required
+  checkSel('payMethod','Payment Method');
+  checkText('billCompany','Billing Company Name');
+  checkText('shipCompany','Shipping Company / Care Of');
+
+  // Items: at least one valid line with SKU + Sell Price
   const body = document.getElementById('itemsBody');
   let anyValidLine = false;
   if (body){
@@ -995,7 +1019,8 @@ function validateRequiredForEmail(){
                       tr.querySelectorAll('td')[11]?.querySelector('input,textarea,select');
       const sku   = (skuEl?.value || '').trim();
       const price = (priceEl?.value || '').trim();
-      const rowHasAnyInput = [...tr.querySelectorAll('input,select,textarea')].some(i => (i.value||'').trim());
+      const rowHasAnyInput = [...tr.querySelectorAll('input,select,textarea')]
+        .some(i => (i.value||'').trim());
       const inPlay = rowHasAnyInput || sku || price;
 
       const errs = [];
@@ -1005,10 +1030,14 @@ function validateRequiredForEmail(){
       if (sku && price) anyValidLine = true;
     });
   }
-  if (!anyValidLine){ miss.push('At least one line with OrderTime SKU and Sell Price'); markErr('itemsCard'); }
+  if (!anyValidLine){
+    miss.push('At least one line with OrderTime SKU and Sell Price');
+    markErr('itemsCard');
+  }
 
   return { ok: miss.length === 0, missing: miss };
 }
+
 
 function showValidationWarning(missing){
   const box = statusBox();
