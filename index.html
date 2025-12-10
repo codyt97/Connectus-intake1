@@ -1824,7 +1824,7 @@ const PAIRING_SKU_MAP = {
 const PAIRING_SKUS = new Set(Object.values(PAIRING_SKU_MAP).map(x => String(x.sku || '').toLowerCase()));
 // === Column safeguards (align with your table header) ===
 if (typeof window.COL_DESC === 'undefined') window.COL_DESC = 0;
-if (typeof window.COL_SKU  === 'undefined') window.COL_SKU  = 3;
+if (typeof window.COL_SKU  === 'undefined') window.COL_SKU  = 1;
 // ===== Row-scoped "New Device Details" with License override =====
 
 // Read inputs from a row
