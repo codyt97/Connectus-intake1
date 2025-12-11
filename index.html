@@ -3205,15 +3205,55 @@ function applyPastedCustomer(textareaId){
   const resEl = document.getElementById('resShip');
   if (resEl) resEl.checked = !!data.shipping?.residence;
 
-  // Payment & options
+    // Payment & options
   const pm = pick(data.payment?.method); if (pm) selectByTextExact('payMethod', pm);
   setVal('payTerms', pick(data.payment?.terms));
   const tax = document.getElementById('taxExempt');    if (tax) tax.checked = !!data.payment?.taxExempt;
   const agr = document.getElementById('hasAgreement'); if (agr) agr.checked = !!data.payment?.agreement;
 
-  if (data.shippingOptions?.pay)   selectByTextExact('shipPay',   data.shippingOptions.pay);
-  if (data.shippingOptions?.speed) selectByTextExact('shipSpeed', data.shippingOptions.speed);
-  if (data.shippingOptions?.shortShip) selectByTextExact('shortShip', data.shippingOptions.shortShip);
+  // ---- Shipping Options (wired to new UI fields) ----
+  const so = data.shippingOptions || {};
+
+  // 1) Ship Method – prefer explicit shipMethod, fall back to speed if needed
+  const shipMethodVal = pick(so.shipMethod, so.speed);
+  if (shipMethodVal) {
+    selectByTextExact('shipMethod', shipMethodVal);
+  }
+
+  // 2) Shipping Payment Method – prefer payMethod, fall back to pay
+  const payMethodVal = pick(so.payMethod, so.pay);
+  if (payMethodVal) {
+    selectByTextExact('shipPayMethod', payMethodVal);
+  }
+
+  // 3) Freight Type
+  if (so.freightType) {
+    selectByTextExact('freightType', so.freightType);
+  }
+
+  // 4) Allow Partial Ship – mapping from shortShip (string or boolean)
+  const allowEl = document.getElementById('allowPartial');
+  if (allowEl && so.shortShip !== undefined) {
+    if (typeof so.shortShip === 'boolean') {
+      allowEl.checked = so.shortShip;
+    } else if (typeof so.shortShip === 'string') {
+      const s = so.shortShip.toLowerCase();
+      allowEl.checked =
+        s === 'yes' || s === 'y' || s === 'true' || s === 'allow';
+    }
+  }
+
+  // 5) Blind Ship – mapping from blindShip (string or boolean)
+  const blindEl = document.getElementById('blindShip');
+  if (blindEl && so.blindShip !== undefined) {
+    if (typeof so.blindShip === 'boolean') {
+      blindEl.checked = so.blindShip;
+    } else if (typeof so.blindShip === 'string') {
+      const s = so.blindShip.toLowerCase();
+      blindEl.checked = s === 'yes' || s === 'y' || s === 'true';
+    }
+  }
+
 
   // Reps / carrier
   if (pick(data.rep?.primary))   selectByTextExact('rep1', pick(data.rep?.primary));
@@ -3264,7 +3304,9 @@ async function loadSO(id){
     const raw = await api(`/ordertime/salesorders/get?docNo=${encodeURIComponent(id)}`);
 
     // Some backends return { ok, order }, others return the raw SO.
-    const base = raw?.order ?? raw;
+    // Prefer raw.fullPayload (if present), else raw.order, else raw
+    const base = raw?.raw ?? raw?.order ?? raw;
+
 
     // Normalize to the JSON shape your applyClonedOrder() already expects
     const get = (o, p, d='') => {
@@ -3372,10 +3414,22 @@ function applyClonedOrder(){
   document.getElementById('taxExempt').checked = !!p.taxExempt;
   document.getElementById('hasAgreement').checked = !!p.agreement;
 
-  const so = data.shippingOptions || {};
-  if(so.pay) selectByTextExact('shipPay', so.pay);
-  if(so.speed) selectByTextExact('shipSpeed', so.speed);
-  if(so.shortShip) selectByTextExact('shortShip', so.shortShip);
+    const so = data.shippingOptions || {};
+
+  // Dropdowns
+  if (so.method)      selectByTextExact('shipMethod',    so.method);
+  if (so.payMethod)   selectByTextExact('shipPayMethod', so.payMethod);
+  if (so.freightType) selectByTextExact('freightType',   so.freightType);
+
+  // Checkboxes
+  const tzEl = document.getElementById('techZoneReq');
+  const apEl = document.getElementById('allowPartial');
+  const bsEl = document.getElementById('blindShip');
+
+  if (tzEl) tzEl.checked = !!so.techZoneRequired;
+  if (apEl) apEl.checked = !!so.allowPartial;
+  if (bsEl) bsEl.checked = !!so.blindShip;
+
 
   // ----- Items (replace current rows with cloned items)
   document.getElementById('itemsBody').innerHTML = '';
@@ -3473,6 +3527,27 @@ async function loadSO(id){
 
     // Normalize to the JSON shape your applyClonedOrder() already expects
     const get = (o, p, d='') => { try { return p.split('.').reduce((x,k)=>x?.[k], o) ?? d; } catch { return d; } };
+        // Helper: extract Custom Field from OT header
+    const getCF = (o, captionOrName) => {
+      try {
+        const list = o?.CustomFields || o?.customFields || [];
+        const row = list.find(cf =>
+          cf?.Caption === captionOrName ||
+          cf?.Name === captionOrName
+        );
+        return row?.Value ?? '';
+      } catch {
+        return '';
+      }
+    };
+
+    // Normalize "Yes", "Y", "1", "TRUE" etc.
+    const toBool = (v) => {
+      if (typeof v === 'boolean') return v;
+      if (v == null) return false;
+      const s = String(v).toLowerCase();
+      return s === 'yes' || s === 'true' || s === '1' || s === 'y';
+    };
 
     const billing = {
       contact: get(base,'BillTo.ContactName'),
@@ -3513,7 +3588,41 @@ async function loadSO(id){
       shipping,
       items,
       payment: { method: get(base,'PaymentMethod') || '', terms: get(base,'Terms') || '' },
-      shippingOptions: { pay: get(base,'ShipPayMethod') || '', speed: get(base,'ShipSpeed') || '', shortShip: get(base,'ShortShip') || '' }
+            shippingOptions: {
+        // Standard shipping fields
+        method:
+          get(base,'ShipMethodRef.Name') ||
+          get(base,'ShipMethod') ||
+          '',
+
+        payMethod:
+          getCF(base,'Shipping Payment Method') ||
+          get(base,'ShipPayMethod') ||
+          '',
+
+        freightType:
+          getCF(base,'Freight Type') ||
+          get(base,'FreightType') ||
+          '',
+
+        // Flags
+        techZoneRequired: toBool(
+          getCF(base,'Tech Zone Required') ||
+          get(base,'TechZoneRequired')
+        ),
+
+        allowPartial: toBool(
+          getCF(base,'Allow Ship Partial') ||
+          getCF(base,'Allow Partial Ship') ||
+          get(base,'AllowShipPartial')
+        ),
+
+        blindShip: toBool(
+          getCF(base,'Blind Ship') ||
+          get(base,'BlindShip')
+        )
+      }
+
     };
 
     document.getElementById('clonePaste').value = JSON.stringify(shaped, null, 2);
@@ -3991,7 +4100,13 @@ function buildCSV(){
     ['Ship Company/Care Of', val('shipCompany')], ['Ship Contact', val('shipContact')], ['Ship Phone', val('shipPhone')], ['Ship Email', val('shipEmail')],
     ['Ship Street', val('shipStreet')], ['Ship Suite', val('shipSuite')], ['Ship City', val('shipCity')], ['Ship State', val('shipState')], ['Ship Zip', val('shipZip')],
     ['Residence', bool('resShip') ? 'Yes' : 'No'],
-    ['Ship Pay Method', val('shipPay')], ['Ship Speed', val('shipSpeed')], ['Short Ship', val('shortShip')],
+    ['Ship Method', getSelText('shipMethod')],
+    ['Shipping Payment Method', getSelText('shipPayMethod')],
+    ['Freight Type', getSelText('freightType')],
+    ['Tech Zone Required', bool('techZoneReq') ? 'Yes' : 'No'],
+    ['Allow Partial Ship', bool('allowPartial') ? 'Yes' : 'No'],
+    ['Blind Ship', bool('blindShip') ? 'Yes' : 'No'],
+
     ['Requested Ship Date', val('reqShipDate')], ['Expected Ship Date', val('expShipDate')],
     ['Internal Notes', document.getElementById('notes')?.value || '']
   ];
