@@ -4,7 +4,9 @@ const API_KEY = process.env.OT_API_KEY;
 const EMAIL   = process.env.OT_EMAIL;
 const PASS    = process.env.OT_PASSWORD;
 const DEVKEY  = process.env.OT_DEV_KEY;
-const DEBUG   = String(process.env.OT_DEBUG || '').toLowerCase() === '1' || String(process.env.OT_DEBUG || '').toLowerCase() === 'true';
+const DEBUG   =
+  String(process.env.OT_DEBUG || '').toLowerCase() === '1' ||
+  String(process.env.OT_DEBUG || '').toLowerCase() === 'true';
 
 function assertEnv() {
   if (!BASE)    throw new Error('Missing OT_BASE_URL');
@@ -15,10 +17,10 @@ function assertEnv() {
 
 function authHeaders() {
   const h = { ApiKey: API_KEY, Email: EMAIL };
-  if (DEVKEY) h.DevKey = DEVKEY; else h.Password = PASS;
+  if (DEVKEY) h.DevKey = DEVKEY;
+  else h.Password = PASS;
   return h;
 }
-
 
 async function tryPost(path, body) {
   const url = `${BASE}${path}`;
@@ -28,13 +30,18 @@ async function tryPost(path, body) {
     body: JSON.stringify(body || {}),
   });
   const text = await res.text();
-  if (DEBUG) console.log(`[OT] POST ${path} -> ${res.status} ${text.slice(0, 220)}`);
+  if (DEBUG) {
+    console.log(`[OT] POST ${path} -> ${res.status} ${text.slice(0, 220)}`);
+  }
   return { ok: res.ok, status: res.status, text, json: safeJSON(text) };
 }
 
-function safeJSON(t) { try { return JSON.parse(t); } catch { return null; } }
+function safeJSON(t) {
+  try { return JSON.parse(t); } catch { return null; }
+}
 
-// Replace the whole function with this:
+/* ---------- Generic list normalizer ---------- */
+
 export function normalizeListResult(data) {
   if (!data) return [];
 
@@ -46,7 +53,7 @@ export function normalizeListResult(data) {
     'Items', 'items',
     'List', 'list',
     'Results', 'results',
-    'Rows', 'rows'
+    'Rows', 'rows',
   ];
   for (const k of keys) {
     if (Array.isArray(data[k])) return data[k];
@@ -67,32 +74,29 @@ export function normalizeListResult(data) {
   return [];
 }
 
+/* ---------- Customers: multi-strategy list search ---------- */
 
-/* ---------- Public helpers ---------- */
-
-// Multi-strategy list search for Customers
 export async function listCustomersByName(q, page = 1, pageSize = 25) {
   assertEnv();
 
-  const paths   = ['/list', '/List']; // some tenants care about casing
-  const fields  = ['Name', 'CompanyName']; // common name fields
+  const paths    = ['/list', '/List'];           // casing differences
+  const fields   = ['Name', 'CompanyName'];      // common name fields
   const payloads = [];
 
-  // Build multiple payload variants (string vs array; Name vs CompanyName)
   for (const field of fields) {
     // Variant A: FilterValueArray as string
     payloads.push({
       Type: 120, // Customer
-      Filters: [{ PropertyName: field, Operator: 12, FilterValueArray: q || '' }], // 12 = contains
+      Filters: [{ PropertyName: field, Operator: 12, FilterValueArray: q || '' }], // contains
       PageNumber: Number(page) || 1,
-      NumberOfRecords: Math.min(Math.max(Number(pageSize) || 25, 1), 100)
+      NumberOfRecords: Math.min(Math.max(Number(pageSize) || 25, 1), 100),
     });
     // Variant B: FilterValueArray as array
     payloads.push({
       Type: 120,
       Filters: [{ PropertyName: field, Operator: 12, FilterValueArray: [q || ''] }],
       PageNumber: Number(page) || 1,
-      NumberOfRecords: Math.min(Math.max(Number(pageSize) || 25, 1), 100)
+      NumberOfRecords: Math.min(Math.max(Number(pageSize) || 25, 1), 100),
     });
   }
 
@@ -103,10 +107,9 @@ export async function listCustomersByName(q, page = 1, pageSize = 25) {
         const out = await tryPost(p, body);
         if (out.ok) {
           const items = normalizeListResult(out.json);
-          if (items.length || q === '') return items; // accept empty only if blank search
-          // If 200 but 0 items, keep trying other combos
+          if (items.length || q === '') return items;
         } else {
-          lastErr = new Error(`${p} ${out.status}: ${out.text.slice(0,200)}`);
+          lastErr = new Error(`${p} ${out.status}: ${out.text.slice(0, 200)}`);
         }
       } catch (e) {
         lastErr = e;
@@ -114,19 +117,19 @@ export async function listCustomersByName(q, page = 1, pageSize = 25) {
     }
   }
   if (lastErr) throw lastErr;
-  return []; // fallback
+  return [];
 }
 
 /* ---------- Sales Orders helper: use ONLY /list; try scalar+array filters ---------- */
+
 export async function searchSalesOrders(criteria = {}, page = 1, pageSize = 50) {
   assertEnv();
 
   const { q = '', docNo = '', customer = '', status = '', dateFrom = '', dateTo = '' } = criteria;
 
-  const PATH = '/list';                 // <- the only valid OT list endpoint
-  const TYPES = [130, 135, 131];        // your known-good SO header types
+  const PATH  = '/list';
+  const TYPES = [130, 135, 131]; // your known-good SO header types
 
-  // field variants
   const F = {
     DocNo:        ['DocNo', 'DocumentNo', 'DocNumber'],
     CustomerName: ['CustomerName', 'Customer', 'CustName'],
@@ -144,23 +147,25 @@ export async function searchSalesOrders(criteria = {}, page = 1, pageSize = 50) 
     const fv = asArray ? [v] : v;
     return props.map(p => ({ PropertyName: p, Operator: 12, FilterValueArray: fv })); // contains
   };
+
   const eqFilters = (props, val, asArray = false) => {
     const v = (val == null ? '' : String(val)).trim();
     if (!v) return [];
     const fv = asArray ? [v] : v;
-    return props.map(p => ({ PropertyName: p, Operator: 0, FilterValueArray: fv }));  // equals
+    return props.map(p => ({ PropertyName: p, Operator: 0, FilterValueArray: fv })); // equals
   };
+
   const dateFilters = () => {
     const out = [];
     if (dateFrom && dateTo) out.push({ PropertyName: F.DocDate[0], Operator: 7, FilterValueArray: [dateFrom, dateTo] }); // between
-    else if (dateFrom)     out.push({ PropertyName: F.DocDate[0], Operator: 3, FilterValueArray: dateFrom });            // >=
-    else if (dateTo)       out.push({ PropertyName: F.DocDate[0], Operator: 5, FilterValueArray: dateTo });              // <=
+    else if (dateFrom)      out.push({ PropertyName: F.DocDate[0], Operator: 3, FilterValueArray: dateFrom });            // >=
+    else if (dateTo)        out.push({ PropertyName: F.DocDate[0], Operator: 5, FilterValueArray: dateTo });              // <=
     return out;
   };
 
-  const qDoc = (docNo || q || '').trim();
-  const tryAsArray = [false, true]; // some tenants require arrays
-  let lastErr = null;
+  const qDoc       = (docNo || q || '').trim();
+  const tryAsArray = [false, true];
+  let lastErr      = null;
 
   for (const TYPE of TYPES) {
     for (const arr of tryAsArray) {
@@ -185,7 +190,10 @@ export async function searchSalesOrders(criteria = {}, page = 1, pageSize = 50) 
 
       try {
         const out = await tryPost(PATH, body);
-        if (!out.ok) { lastErr = new Error(`${PATH} ${out.status}: ${out.text?.slice?.(0,180)}`); continue; }
+        if (!out.ok) {
+          lastErr = new Error(`${PATH} ${out.status}: ${out.text?.slice?.(0, 180)}`);
+          continue;
+        }
 
         const rows = normalizeListResult(out.json);
         return rows.map(r => ({
@@ -208,6 +216,7 @@ export async function searchSalesOrders(criteria = {}, page = 1, pageSize = 50) 
   return [];
 }
 
+/* ---------- Item search helper ---------- */
 
 export async function searchPartItems(q, take = 50) {
   assertEnv();
@@ -215,7 +224,7 @@ export async function searchPartItems(q, take = 50) {
     Type: 115, // Items
     NumberOfRecords: Number(take) || 50,
     PageNumber: 1,
-    SortOrder: { PropertyName: 'Name', Direction: 1 }, // Asc
+    SortOrder: { PropertyName: 'Name', Direction: 1 },
     Filters: [
       { PropertyName: 'Name',               Operator: 12, FilterValueArray: q },
       { PropertyName: 'Description',        Operator: 12, FilterValueArray: q },
@@ -225,12 +234,12 @@ export async function searchPartItems(q, take = 50) {
   };
 
   const out = await tryPost('/list', body);
-  if (!out.ok) throw new Error(`/list ${out.status}: ${out.text.slice(0,180)}`);
+  if (!out.ok) throw new Error(`/list ${out.status}: ${out.text.slice(0, 180)}`);
 
   const rows = normalizeListResult(out.json);
   return rows.map(r => ({
-    id:   r.Id ?? r.ID ?? r.id,
-    name: r.Name ?? '',
+    id:          r.Id ?? r.ID ?? r.id,
+    name:        r.Name ?? '',
     description: r.Description ?? '',
     mfgPartNo:   r.ManufacturerPartNo ?? '',
     upc:         r.UPC ?? '',
@@ -239,6 +248,7 @@ export async function searchPartItems(q, take = 50) {
   }));
 }
 
+/* ---------- Customer detail normalizer (used by WCP) ---------- */
 
 export async function getCustomerById(id) {
   assertEnv();
@@ -247,90 +257,142 @@ export async function getCustomerById(id) {
     headers: authHeaders(),
   });
   const txt = await res.text();
-  if (DEBUG) console.log(`[OT] GET /customer?id=${id} -> ${res.status} ${txt.slice(0,220)}`);
-  if (!res.ok) throw new Error(`/customer ${res.status}: ${txt.slice(0,300)}`);
+  if (DEBUG) {
+    console.log(
+      `[OT] GET /customer?id=${id} -> ${res.status} ${txt.slice(0, 220)}`
+    );
+  }
+  if (!res.ok) throw new Error(`/customer ${res.status}: ${txt.slice(0, 300)}`);
   const x = safeJSON(txt) || {};
 
+  // Helper: OT CustomFields[] lookup by caption or name
+  const getCF = (captionOrName) => {
+    try {
+      const list = x.CustomFields || [];
+      const row = list.find(
+        (cf) => cf?.Caption === captionOrName || cf?.Name === captionOrName
+      );
+      return row?.Value ?? '';
+    } catch {
+      return '';
+    }
+  };
+
+  // Helper: coerce strings like "True", "Yes", "1" into boolean
+  const toBool = (v) => {
+    if (typeof v === 'boolean') return v;
+    if (v == null) return false;
+    const s = String(v).trim().toLowerCase();
+    return s === 'yes' || s === 'true' || s === 'y' || s === '1';
+  };
+
   // Normalize to the structure your UI expects (per OT Customer docs)
-return {
-  company:
-    x.CompanyName || x.Name || '',
+  return {
+    company: x.CompanyName || x.Name || '',
 
-  // OT: Primary contact is nested; build a readable string
-  billing: {
-    contact: [
-      x.PrimaryContact?.Salutation,
-      x.PrimaryContact?.FirstName,
-      x.PrimaryContact?.MiddleName,
-      x.PrimaryContact?.LastName
-    ].filter(Boolean).join(' ').trim(),
-    phone:   x.PrimaryContact?.Phone || '',       // if your tenant exposes it
-    email:   x.BillAddress?.Email || '',          // OT puts email on the address block
-// Many tenants store the company/care-of in Addr1 and the actual street in Addr2
-street:  x.BillAddress?.Addr2 || x.BillAddress?.Addr1 || '',
-suite:   x.BillAddress?.Addr3 || '',
-city:    x.BillAddress?.City || '',
-state:   x.BillAddress?.State || '',
-zip:     x.BillAddress?.Zip || ''
+    // OT: Primary contact is nested; build a readable string
+    billing: {
+      contact: [
+        x.PrimaryContact?.Salutation,
+        x.PrimaryContact?.FirstName,
+        x.PrimaryContact?.MiddleName,
+        x.PrimaryContact?.LastName,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .trim(),
+      phone: x.PrimaryContact?.Phone || '',
+      email: x.BillAddress?.Email || '',
+      // Many tenants store the company/care-of in Addr1 and the actual street in Addr2
+      street: x.BillAddress?.Addr2 || x.BillAddress?.Addr1 || '',
+      suite: x.BillAddress?.Addr3 || '',
+      city: x.BillAddress?.City || '',
+      state: x.BillAddress?.State || '',
+      zip: x.BillAddress?.Zip || '',
+    },
 
-  },
+    shipping: {
+      company: x.CompanyName || x.Name || '',
+      contact: '',
+      phone: '',
+      email: x.PrimaryShipAddress?.Email || '',
+      // Same pattern: street is usually in Addr2, company/care-of in Addr1
+      street: x.PrimaryShipAddress?.Addr2 || x.PrimaryShipAddress?.Addr1 || '',
+      suite: x.PrimaryShipAddress?.Addr3 || '',
+      city: x.PrimaryShipAddress?.City || '',
+      state: x.PrimaryShipAddress?.State || '',
+      zip: x.PrimaryShipAddress?.Zip || '',
+      residence: false,
+    },
 
-  shipping: {
-    company: x.CompanyName || x.Name || '',       // same company unless you track per-ship-to
-    contact: '',                                   // fill if your tenant has ship-to contact fields
-    phone:   '',                                   // fill if present
-    email:   x.PrimaryShipAddress?.Email || '',
-// Same pattern: street is usually in Addr2, company/care-of in Addr1
-street:  x.PrimaryShipAddress?.Addr2 || x.PrimaryShipAddress?.Addr1 || '',
-suite:   x.PrimaryShipAddress?.Addr3 || '',
-city:    x.PrimaryShipAddress?.City || '',
-state:   x.PrimaryShipAddress?.State || '',
-zip:     x.PrimaryShipAddress?.Zip || '',
-
-    residence: false                               // set if your tenant flags residential on ship-to
-  },
-
-  payment: {
-    method:  x.PaymentMethodRef?.Name || '',
-    terms:   x.TermRef?.Name || '',
-    taxExempt: !!(x.SalesTaxCodeRef?.Name && x.SalesTaxCodeRef.Name.toLowerCase().includes('non')),
-    agreement: false
-  },
+    payment: {
+      method: x.PaymentMethodRef?.Name || '',
+      terms: x.TermRef?.Name || '',
+      taxExempt: !!(
+        x.SalesTaxCodeRef?.Name &&
+        x.SalesTaxCodeRef.Name.toLowerCase().includes('non')
+      ),
+      agreement: false,
+    },
 
     // Shipping tab defaults from the OT Customer record
-  shippingOptions: {
-    // Carrier method, e.g. "FedEx Ground Home Delivery - RPHD"
-    shipMethod:  x.ShipMethodRef?.Name || '',
+    shippingOptions: {
+      // Carrier method, e.g. "FedEx Ground Home Delivery - RPHD"
+      shipMethod:
+        x.ShipMethodRef?.Name ||
+        getCF('Ship Method') ||
+        '',
 
-    // How freight is paid, e.g. "Customer FedEx Account"
-    payMethod:   x.ShipPayMethod || '',
+      // How freight is paid, e.g. "Customer FedEx Account"
+      payMethod:
+        x.ShipPayMethod ||
+        getCF('Shipping Payment Method') ||
+        '',
 
-    // Freight type, e.g. "[TPB] Third Party Billing, to the account number supplied below"
-    freightType: x.FreightTypeRef?.Name || x.FreightType || '',
+      // Freight type, e.g. "[TPB] Third Party Billing, to the account number supplied below"
+      freightType:
+        x.FreightTypeRef?.Name ||
+        x.FreightType ||
+        getCF('Freight Type') ||
+        '',
 
-    // OT "ShortShip" usually holds "MustShipComplete"/"MayShipPartial"
-    shortShip:   x.ShortShip || '',
+      // OT ShortShip usually holds "MustShipComplete"/"MayShipPartial"
+      // UI will interpret this into the Allow Partial Ship checkbox
+      shortShip:
+        x.ShortShip ||
+        getCF('Allow Ship Partial') ||
+        '',
 
-    // Blind Ship flag if your tenant exposes it
-    blindShip:   !!x.BlindShip,
+      // Blind Ship flag (customer default)
+      blindShip: toBool(
+        x.BlindShip ??
+        getCF('Blind Ship')
+      ),
 
-    // Legacy fields kept so older JSON doesn’t explode
-    pay:   x.ShipPayMethod || '',
-    speed: ''
-  },
+      // Optional: account numbers if you decide to surface them later
+      fedexAccount:
+        getCF('FedEx Account #') ||
+        x.FedExAccount ||
+        '',
 
+      upsAccount:
+        getCF('UPS Account #') ||
+        x.UPSAccount ||
+        '',
 
-  rep: {
-    primary:   x.SalesRepRef?.Name || '',
-    secondary: ''
-  },
+      // Legacy fields kept so older JSON doesn’t explode
+      pay:   x.ShipPayMethod || '',
+      speed: '',
+    },
 
-  carrierRep: {
-    name:  '',
-    email: ''
-  }
-};
+    rep: {
+      primary: x.SalesRepRef?.Name || '',
+      secondary: '',
+    },
 
-
-
+    carrierRep: {
+      name: '',
+      email: '',
+    },
+  };
 }
