@@ -3211,7 +3211,7 @@ function applyPastedCustomer(textareaId){
   const tax = document.getElementById('taxExempt');    if (tax) tax.checked = !!data.payment?.taxExempt;
   const agr = document.getElementById('hasAgreement'); if (agr) agr.checked = !!data.payment?.agreement;
 
-  // ---- Shipping Options (wired to new UI fields) ----
+    // ---- Shipping Options (wired to new UI fields) ----
   const so = data.shippingOptions || {};
 
   // 1) Ship Method – prefer explicit shipMethod, fall back to speed if needed
@@ -3226,12 +3226,33 @@ function applyPastedCustomer(textareaId){
     selectByTextExact('shipPayMethod', payMethodVal);
   }
 
-  // 3) Freight Type
+  // 3) FedEx / UPS third-party account (single UI field: thirdPartyAcct)
+  //    Map shippingOptions.fedexAccount / upsAccount into that field.
+  const acctInput = document.getElementById('thirdPartyAcct');
+  if (acctInput) {
+    let incomingAcct = '';
+
+    // Prefer explicit carrier-specific fields from the payload
+    if (so.fedexAccount) {
+      incomingAcct = String(so.fedexAccount).trim();
+    } else if (so.upsAccount) {
+      incomingAcct = String(so.upsAccount).trim();
+    }
+
+    if (incomingAcct) {
+      acctInput.value = incomingAcct;
+
+      // Mark as customer-provided so our own auto-fill logic doesn't overwrite it
+      acctInput.dataset.autofill = 'false';
+    }
+  }
+
+  // 4) Freight Type
   if (so.freightType) {
     selectByTextExact('freightType', so.freightType);
   }
 
-  // 4) Allow Partial Ship – mapping from shortShip (string or boolean)
+  // 5) Allow Partial Ship – mapping from shortShip (string or boolean)
   const allowEl = document.getElementById('allowPartial');
   if (allowEl && so.shortShip !== undefined) {
     if (typeof so.shortShip === 'boolean') {
@@ -3243,7 +3264,7 @@ function applyPastedCustomer(textareaId){
     }
   }
 
-  // 5) Blind Ship – mapping from blindShip (string or boolean)
+  // 6) Blind Ship – mapping from blindShip (string or boolean)
   const blindEl = document.getElementById('blindShip');
   if (blindEl && so.blindShip !== undefined) {
     if (typeof so.blindShip === 'boolean') {
@@ -3253,6 +3274,7 @@ function applyPastedCustomer(textareaId){
       blindEl.checked = s === 'yes' || s === 'y' || s === 'true';
     }
   }
+
 
 
   // Reps / carrier
